@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Sensor Prediction</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.3/socket.io.js"></script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(to right, #ff9a9e, #fad0c4);
+            color: #333;
+            position: relative;
+            overflow: hidden;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.85);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            max-width: 500px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            position: relative;
+            z-index: 2;
+        }
+        h1 {
+            margin-bottom: 20px;
+            font-size: 28px;
+            color: #d7263d;
+        }
+        p, h2 {
+            font-size: 22px;
+        }
+        #prediction {
+            font-size: 32px;
+            font-weight: bold;
+            margin: 20px 0;
+            transition: all 0.3s ease;
+        }
+        .normal { color: #27ae60; }
+        .abnormal {
+            color: #d7263d;
+            font-size: 28px;
+            font-weight: bold;
+            animation: blink 0.5s infinite alternate, shake 0.5s infinite;
+        }
+        #sensor_values, #abnormal {
+            font-size: 20px;
+            opacity: 0.9;
+        }
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.2; }
+            100% { opacity: 1; }
+        }
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(5px); }
+        }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔬 IoT Sensor Prediction</h1>
+        <p id="sensor_values">⏳ Đang tải dữ liệu...</p>
+        <h2 id="prediction" class="normal">⏳ Đang tải dữ liệu...</h2>
+        <p id="abnormal" class="abnormal hidden">🚨 NGUY HIỂM! Kiểm tra ngay! 🚨</p>
+        <button id="enableSound">🔊 Bật âm thanh cảnh báo</button>
+        <audio id="alertSound" src="https://www.myinstants.com/media/sounds/alarm.mp3" preload="auto"></audio>
+    </div>
+    <script>
+        let audio = document.getElementById("alertSound");
+        let enableSoundButton = document.getElementById("enableSound");
+        let abnormalElement = document.getElementById("abnormal");
+
+        enableSoundButton.addEventListener("click", () => {
+            audio.play().then(() => {
+                enableSoundButton.style.display = "none";
+            }).catch(error => console.log("Không thể phát âm thanh: ", error));
+        });
+
+        function playAlert() {
+            audio.currentTime = 0;
+            audio.play().catch(error => console.log("Autoplay bị chặn: ", error));
+        }
+
+        function updatePrediction(status) {
+            let predictionElement = document.getElementById("prediction");
+            if (status === "abnormal") {
+                predictionElement.className = "abnormal";
+                predictionElement.textContent = "🚨 NGUY HIỂM! Kiểm tra ngay! 🚨";
+                abnormalElement.classList.remove("hidden");
+                playAlert();
+            } else {
+                predictionElement.className = "normal";
+                predictionElement.textContent = "✅ Bình thường";
+                abnormalElement.classList.add("hidden");
+            }
+        }
+    </script>
+</body>
+</html>
