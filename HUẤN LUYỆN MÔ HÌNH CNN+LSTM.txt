@@ -1,0 +1,130 @@
+import tensorflow as tf
+import numpy as np
+import os
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import classification_report, confusion_matrix
+from tensorflow.keras.models import Sequential, load_model
+from tensorflow.keras.layers import Conv1D, MaxPooling1D, LSTM, Dense, Dropout
+from tensorflow.keras.callbacks import EarlyStopping
+
+# Bước 1: Kiểm tra GPU// bỏbỏ
+print("GPU có sẵn:", tf.config.list_physical_devices('GPU'))
+
+# Bước 2: Upload file dữ liệu nếu chạy trên Google Colab
+try:
+    from google.colab import files
+    uploaded = files.upload()  # Mở hộp thoại để tải file lên
+    print("Danh sách file đã tải lên:", os.listdir())
+except:
+    print("Không chạy trên Google Colab, bỏ qua bước upload.")
+
+# Bước 3: Nạp dữ liệu và kiểm tra
+X = np.load("X_windows.npy")
+y = np.load("y_labels.npy")
+
+print("Shape của X:", X.shape)  # (số cửa sổ, 50 mẫu, 6 đặc trưng)
+print("Shape của y:", y.shape)  # (số cửa sổ)
+
+# Kiểm tra giá trị NaN
+if np.isnan(X).sum() > 0 or np.isnan(y).sum() > 0:
+    print("Dữ liệu chứa NaN, cần xử lý!")
+    X = np.nan_to_num(X)
+    y = np.nan_to_num(y)
+
+# Kiểm tra phân phối nhãn
+import collections
+print("Phân phối nhãn:", collections.Counter(y))
+
+# Bước 4: Chia tập Train/Test
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+print(f"Số lượng mẫu train: {len(X_train)}")
+print(f"Số lượng mẫu test: {len(X_test)}")
+
+# Chuẩn hóa dữ liệu
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train.reshape(-1, 6)).reshape(X_train.shape)
+X_test = scaler.transform(X_test.reshape(-1, 6)).reshape(X_test.shape)
+
+# Bước 5: Xây dựng mô hình CNN + LSTM
+model = Sequential([
+    Conv1D(filters=64, kernel_size=3, activation='relu', input_shape=(50, 6)),  # CNN Layer
+    MaxPooling1D(pool_size=2),
+    
+    LSTM(64, return_sequences=True),  # LSTM Layer
+    Dropout(0.3),
+    LSTM(32),
+    Dropout(0.3),
+    
+    Dense(16, activation="relu"),
+    Dense(5, activation="softmax")  # 5 lớp tương ứng với 5 loại hành động
+])
+
+# Compile mô hình
+model.compile(loss="sparse_categorical_crossentropy",
+              optimizer="adam",
+              metrics=["accuracy"])
+
+# Hiển thị mô hình
+model.summary()
+
+# Bước 6: Huấn luyện mô hình với EarlyStopping
+early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+
+history = model.fit(
+    X_train, y_train,
+    validation_data=(X_test, y_test),
+    epochs=30,  # Số vòng huấn luyện
+    batch_size=32,
+    verbose=1,
+    callbacks=[early_stopping]  # Thêm EarlyStopping
+)
+
+# Bước 7: Đánh giá mô hình
+loss, acc = model.evaluate(X_test, y_test)
+print(f"Độ chính xác trên tập test: {acc * 100:.2f}%")
+
+# Bước 8: Vẽ biểu đồ loss và accuracy
+plt.figure(figsize=(12, 4))
+
+plt.subplot(1, 2, 1)
+plt.plot(history.history['loss'], label='Train Loss')
+plt.plot(history.history['val_loss'], label='Val Loss')
+plt.legend()
+plt.title('Loss Over Epochs')
+
+plt.subplot(1, 2, 2)
+plt.plot(history.history['accuracy'], label='Train Acc')
+plt.plot(history.history['val_accuracy'], label='Val Acc')
+plt.legend()
+plt.title('Accuracy Over Epochs')
+
+plt.show()
+
+# Bước 9: Đánh giá chi tiết bằng classification_report
+y_pred = model.predict(X_test)
+y_pred_classes = np.argmax(y_pred, axis=1)
+print(classification_report(y_test, y_pred_classes))
+
+# -- Vẽ Confusion Matrix --
+cm = confusion_matrix(y_test, y_pred_classes)
+plt.figure(figsize=(6, 5))
+sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=range(5), yticklabels=range(5))
+plt.xlabel('Predicted Label')
+plt.ylabel('True Label')
+plt.title('Confusion Matrix')
+plt.show()
+
+# Bước 10: Lưu mô hình
+model.save("fall_detection_cnn_lstm.h5")
+
+# Kiểm tra xem mô hình đã lưu có hoạt động không
+loaded_model = load_model("fall_detection_cnn_lstm.h5")
+sample = np.expand_dims(X_test[0], axis=0)
+prediction = loaded_model.predict(sample)
+print("Dự đoán:", np.argmax(prediction))
